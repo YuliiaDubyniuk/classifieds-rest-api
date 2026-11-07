@@ -1,118 +1,206 @@
-# REST API Дошки оголошень
+# REST API — Classifieds Board
 
-REST API для дошки оголошень з JWT-автентифікацією, авторизацією та контролем доступу. Реалізовано в рамках курсового завдання магістратури.
+A REST API for a classifieds board with JWT authentication, authorization, and access control. Developed as part of a Master's degree coursework project.
 
-## Загальний опис
+## Overview
 
-Чистий JSON API без рендерингу HTML. Бекенд обслуговує клієнтів (React-застосунки, мобільні додатки тощо) через HTTP-запити.
+A JSON-only API without HTML rendering. The backend serves clients (React applications, mobile applications, etc.) through HTTP requests.
 
-Користувачі можуть публікувати, редагувати та видаляти власні оголошення. Анонімні відвідувачі бачать список оголошень і можуть переглядати деталі. Для створення оголошення потрібна реєстрація. Редагувати та видаляти можна лише власні оголошення.
+Users can create, update, and delete their own announcements. Anonymous visitors can browse the list of announcements and view individual announcement details.
 
-Автентифікація — JWT з refresh токенами. Access token: 15 хвилин, refresh token: 7 днів. Token rotation для refresh токенів.
+User registration is required to create announcements. Users can only update and delete their own announcements.
 
-## Технологічний стек
+Authentication is implemented using JWT:
 
-| Технологія                     | Опис                            |
-| ------------------------------ | ------------------------------- |
-| Node.js                        | Середовище виконання            |
-| Express 5                      | Веб-фреймворк                   |
-| Prisma 7                       | ORM для бази даних (PostgreSQL) |
-| Zod                            | Валідація вхідних даних         |
-| bcrypt                         | Хешування паролів               |
-| jsonwebtoken                   | JWT-автентифікація              |
-| @asteasolutions/zod-to-openapi | Генерація OpenAPI документації  |
-| swagger-ui-express             | Swagger UI                      |
-| dotenv                         | Змінні середовища               |
+- Access token lifetime: 15 minutes.
+- Refresh token lifetime: 7 days.
+- Refresh token rotation is implemented when tokens are renewed.
 
-## Встановлення
+## Tech Stack
 
-1. Встановіть залежності:
+| Technology                     | Description                          |
+| ------------------------------ | ------------------------------------ |
+| Node.js                        | JavaScript runtime                   |
+| TypeScript                     | JavaScript with static typing        |
+| Express 5                      | Web framework                        |
+| Prisma 7                       | ORM for PostgreSQL                   |
+| PostgreSQL 17                  | Relational database                  |
+| Docker                         | Application containerization         |
+| Docker Compose                 | Running the application and database |
+| Zod                            | Input validation                     |
+| bcrypt                         | Password hashing                     |
+| jsonwebtoken                   | JWT authentication                   |
+| @asteasolutions/zod-to-openapi | OpenAPI documentation generation     |
+| swagger-ui-express             | Swagger UI                           |
+| dotenv                         | Environment variable management      |
+
+## Installation and Setup
+
+### Option 1: Run with Docker Compose (Recommended)
+
+Requirements:
+
+- Docker Desktop
+- Git
+
+1. Clone the repository:
+
+```bash
+git clone <repository-url>
+cd <project-folder>
+```
+
+2. Create a `.env` file in the project root directory.
+
+3. Configure the environment variables in `.env`:
+
+```env
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your-password
+POSTGRES_DB=classfields
+
+DATABASE_URL=postgresql://postgres:your-password@postgres:5432/classfields?schema=public
+
+JWT_SECRET=your-secret-key
+```
+
+Make sure that the PostgreSQL credentials in `DATABASE_URL` match the values configured in `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`.
+
+The hostname `postgres` is used because it is the PostgreSQL service name in Docker Compose.
+
+4. Build and start the application:
+
+```bash
+docker compose up --build
+```
+
+Docker Compose will:
+
+- Start the PostgreSQL container.
+- Wait until the database is ready.
+- Build the application Docker image.
+- Generate Prisma Client.
+- Start the REST API.
+
+5. Open the API documentation:
+
+```text
+http://localhost:3000/api-docs
+```
+
+To stop the containers:
+
+```bash
+docker compose down
+```
+
+To check migration status:
+
+```bash
+docker compose exec app npx prisma migrate status
+```
+
+To create and apply a new migration:
+
+```bash
+docker compose exec app npx prisma migrate dev --name migration_name
+```
+
+To view application logs:
+
+```bash
+docker compose logs -f app
+```
+
+### Option 2: Run Locally
+
+Requirements:
+
+- Node.js
+- PostgreSQL
+
+1. Install dependencies:
 
 ```bash
 npm install
 ```
 
-2. Створіть файл конфігурації:
+2. Create and configure the `.env` file in the project root directory.
 
-```bash
-cp .env.example .env
-```
-
-3. Налаштуйте `.env`:
+3. For local execution, use `localhost` as the database hostname in `DATABASE_URL`:
 
 ```env
-DATABASE_URL=postgresql://postgres:password@localhost:5432/announcements?schema=public
-JWT_SECRET=your-secret-key-at-least-256-bits-long
+DATABASE_URL=postgresql://postgres:your-password@localhost:5432/classfields?schema=public
 ```
 
-4. Застосуйте міграцію:
+4. Apply database migrations:
 
 ```bash
 npm run prisma:migrate
 ```
 
-5. Запустіть проект:
+5. Start the application in development mode:
 
 ```bash
 npm run dev
 ```
 
-## Маршрути
+## API Routes
 
-### Auth
+### Authentication
 
-| Метод | Шлях             | Опис                          | Auth |
-| ----- | ---------------- | ----------------------------- | ---- |
-| POST  | `/auth/register` | Реєстрація користувача        | Ні   |
-| POST  | `/auth/login`    | Вхід користувача              | Ні   |
-| POST  | `/auth/refresh`  | Оновлення токенів             | Ні   |
-| POST  | `/auth/logout`   | Вихід                         | Ні   |
-| GET   | `/auth/me`       | Профіль поточного користувача | Так  |
+| Method | Endpoint         | Description                    | Auth Required |
+| ------ | ---------------- | ------------------------------ | ------------- |
+| POST   | `/auth/register` | Register a new user            | No            |
+| POST   | `/auth/login`    | Log in                         | No            |
+| POST   | `/auth/refresh`  | Refresh authentication tokens  | No            |
+| POST   | `/auth/logout`   | Log out                        | Yes           |
+| GET    | `/auth/me`       | Get the current user's profile | Yes           |
 
-### Оголошення
+### Announcements
 
-| Метод  | Шлях                 | Опис                                      | Auth |
-| ------ | -------------------- | ----------------------------------------- | ---- |
-| GET    | `/announcements`     | Список з пагінацією, пошуком, сортуванням | Ні   |
-| GET    | `/announcements/:id` | Деталі оголошення                         | Ні   |
-| POST   | `/announcements`     | Створення оголошення                      | Так  |
-| PATCH  | `/announcements/:id` | Часткове оновлення (власне)               | Так  |
-| DELETE | `/announcements/:id` | Видалення (власне)                        | Так  |
+| Method | Endpoint             | Description                                            | Auth Required |
+| ------ | -------------------- | ------------------------------------------------------ | ------------- |
+| GET    | `/announcements`     | Get announcements with pagination, search, and sorting | No            |
+| GET    | `/announcements/:id` | Get announcement details                               | No            |
+| POST   | `/announcements`     | Create an announcement                                 | Yes           |
+| PATCH  | `/announcements/:id` | Partially update an owned announcement                 | Yes           |
+| DELETE | `/announcements/:id` | Delete an owned announcement                           | Yes           |
 
-## Параметри запитів
+## Request Parameters
 
 ### GET /announcements
 
-| Параметр | Тип   | Опис                                            |
-| -------- | ----- | ----------------------------------------------- |
-| `search` | query | Пошук по назві (нечутливий до регістру)         |
-| `sort`   | query | `newest` (за замовчуванням) або `oldest`        |
-| `page`   | query | Номер сторінки (число > 0), 10 записів/сторінка |
+| Parameter | Type  | Description                                               |
+| --------- | ----- | --------------------------------------------------------- |
+| `search`  | query | Search by title (case-insensitive)                        |
+| `sort`    | query | `newest` (default) or `oldest`                            |
+| `page`    | query | Page number (must be greater than 0); 10 records per page |
 
 ### POST /auth/register
 
-| Поле       | Вимоги                                  |
-| ---------- | --------------------------------------- |
-| `username` | рядок, обов'язковий, 3–30 символів      |
-| `email`    | email, обов'язковий                     |
-| `password` | рядок, обов'язковий, мінімум 6 символів |
-| `name`     | рядок, обов'язковий, мінімум 2 символи  |
+| Field      | Requirements                           |
+| ---------- | -------------------------------------- |
+| `username` | Required string, 3–30 characters       |
+| `email`    | Required valid email address           |
+| `password` | Required string, at least 6 characters |
+| `name`     | Required string, at least 2 characters |
 
 ### POST /announcements
 
-| Поле          | Вимоги                                                 |
-| ------------- | ------------------------------------------------------ |
-| `title`       | рядок, обов'язковий, 5–50 символів                     |
-| `description` | рядок, обов'язковий, мінімум 10 символів               |
-| `price`       | число, обов'язкове, > 0                                |
-| `category`    | рядок, обов'язковий: `sale`, `service`, `job`, `other` |
+| Field         | Requirements                                         |
+| ------------- | ---------------------------------------------------- |
+| `title`       | Required string, 5–50 characters                     |
+| `description` | Required string, at least 10 characters              |
+| `price`       | Required number greater than 0                       |
+| `category`    | Required value: `sale`, `service`, `job`, or `other` |
 
-PATCH використовує ті ж правила валідації, але всі поля опціональні (хоча б одне має бути присутнє).
+PATCH uses the same validation rules, but all fields are optional. At least one field must be provided.
 
-## Структура проекту
+## Project Structure
 
-```
-boilerplate/
+```text
+project/
 ├── prisma/
 │   ├── schema.prisma
 │   ├── client.ts
@@ -132,46 +220,54 @@ boilerplate/
 │   │   └── announcements.validator.ts
 │   └── openapi.ts
 ├── app.ts
-├── .env.example
+├── prisma.config.ts
+├── Dockerfile
+├── docker-compose.yml
+├── .dockerignore
 ├── .env
 ├── package.json
 ├── tsconfig.json
-├── prisma.config.ts
 └── README.md
 ```
 
-## Бойлерплейт
+Prisma Client is generated into the `generated/prisma` directory during the Docker image build. This generated directory is not stored in Git.
 
-Мінімальний стартовий набір:
+## Boilerplate
 
-- `package.json` з усіма залежностями
-- `tsconfig.json` з налаштуваннями TypeScript
-- `src/openapi.ts` з ініціалізованим registry та `bearerAuth`
-- `prisma/client.ts` з ініціалізованим Prisma Client (PostgreSQL через `@prisma/adapter-pg`)
-- `prisma.config.ts` з конфігурацією Prisma
-- `.env.example` з шаблоном змінних середовища
+The project includes the following initial configuration:
 
-## Доступні скрипти
+- `package.json` — dependencies and npm scripts.
+- `tsconfig.json` — TypeScript configuration.
+- `src/openapi.ts` — initialized OpenAPI registry and `bearerAuth` configuration.
+- `prisma/client.ts` — Prisma Client initialization using PostgreSQL through `@prisma/adapter-pg`.
+- `prisma.config.ts` — Prisma configuration.
+- `.env` — environment variables required to run the application.
 
-| Команда                   | Опис                                 |
-| ------------------------- | ------------------------------------ |
-| `npm run dev`             | Запуск з hot reload (`node --watch`) |
-| `npm start`               | Запуск у виробничому режимі          |
-| `npm run prisma:migrate`  | Створення та застосування міграцій   |
-| `npm run prisma:generate` | Генерація Prisma Client              |
+## Available Scripts
 
-## Документація API
+| Command                   | Description                                               |
+| ------------------------- | --------------------------------------------------------- |
+| `npm run dev`             | Start the application in development mode with hot reload |
+| `npm start`               | Start the application                                     |
+| `npm run prisma:migrate`  | Create and apply database migrations                      |
+| `npm run prisma:generate` | Generate Prisma Client                                    |
 
-Swagger UI доступний за адресою: http://localhost:3000/api-docs
+## API Documentation
 
-## Prisma schema
+Swagger UI is available at:
 
-Три моделі: `User`, `RefreshToken`, `Announcement`.
+[http://localhost:3000/api-docs](http://localhost:3000/api-docs)
 
-- `User` — `username` (унікальний), хешований `password`, `email` (унікальний), `name`, `createdAt`
-- `RefreshToken` — `token` (унікальний), зв'язок з `User`
-- `Announcement` — `title`, `description`, `price`, `category`, зв'язок з `User`, `createdAt`, `updatedAt`
+The documentation includes API endpoints, request parameters, data schemas, and authorization requirements.
 
-## Ліцензія
+## Prisma Schema
+
+The database contains three models:
+
+- `User` — `username` (unique), hashed `password`, `email` (unique), `name`, and `createdAt`.
+- `RefreshToken` — unique `token` associated with a `User`.
+- `Announcement` — `title`, `description`, `price`, `category`, associated `User`, `createdAt`, and `updatedAt`.
+
+## License
 
 ISC
