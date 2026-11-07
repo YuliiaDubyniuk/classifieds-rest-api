@@ -84,15 +84,6 @@ registry.registerPath({
   tags: ["Auth"],
   summary: "Logout",
   security: [{ bearerAuth: [] }],
-  request: {
-    body: {
-      content: {
-        "application/json": {
-          schema: refreshSchema,
-        },
-      },
-    },
-  },
   responses: {
     204: {
       description: "Logged out successfully",
@@ -130,7 +121,7 @@ const router = Router();
 router.post("/register", validateBody(registerSchema), register);
 router.post("/login", validateBody(loginSchema), login);
 router.post("/refresh", validateBody(refreshSchema), refresh);
-router.post("/logout", authenticate, validateBody(refreshSchema), logout);
+router.post("/logout", authenticate, logout);
 router.get("/me", authenticate, getMe);
 
 export default router;

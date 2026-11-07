@@ -1,4 +1,4 @@
-# REST API — Classifieds Board
+# Classifieds Board REST API
 
 A REST API for a classifieds board with JWT authentication, authorization, and access control. Developed as part of a Master's degree coursework project.
 

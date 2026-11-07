@@ -1,7 +1,7 @@
+import { randomUUID } from "node:crypto";
 import type { RequestHandler } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-
 import prisma from "../../prisma/client.ts";
 import type {
   RegisterInput,
@@ -52,13 +52,21 @@ export const register: RequestHandler = async (req, res) => {
   }
 
   // generate tokens
-  const accessToken = jwt.sign({ sub: user.id, type: "access" }, secret, {
-    expiresIn: "15m",
-  });
+  const accessToken = jwt.sign(
+    { sub: user.id, type: "access", jti: randomUUID() },
+    secret,
+    {
+      expiresIn: "15m",
+    },
+  );
 
-  const refreshToken = jwt.sign({ sub: user.id, type: "refresh" }, secret, {
-    expiresIn: "7d",
-  });
+  const refreshToken = jwt.sign(
+    { sub: user.id, type: "refresh", jti: randomUUID() },
+    secret,
+    {
+      expiresIn: "7d",
+    },
+  );
 
   // save refresh token in database
   await prisma.refreshToken.create({
@@ -86,7 +94,7 @@ export const login: RequestHandler = async (req, res) => {
   // Check if user exists
   if (!user) {
     res.status(401).json({
-      error: "Invalid username or password",
+      error: "Invalid credentials",
     });
     return;
   }
@@ -96,7 +104,7 @@ export const login: RequestHandler = async (req, res) => {
 
   if (!isPasswordValid) {
     res.status(401).json({
-      error: "Invalid username or password",
+      error: "Invalid credentials",
     });
     return;
   }
@@ -108,19 +116,33 @@ export const login: RequestHandler = async (req, res) => {
     throw new Error("JWT_SECRET is not configured");
   }
 
-  const accessToken = jwt.sign({ sub: user.id, type: "access" }, secret, {
-    expiresIn: "15m",
-  });
-  const refreshToken = jwt.sign({ sub: user.id, type: "refresh" }, secret, {
-    expiresIn: "7d",
-  });
-
-  // Save refresh token in database
-  await prisma.refreshToken.create({
-    data: {
-      token: refreshToken,
-      userId: user.id,
+  const accessToken = jwt.sign(
+    { sub: user.id, type: "access", jti: randomUUID() },
+    secret,
+    {
+      expiresIn: "15m",
     },
+  );
+  const refreshToken = jwt.sign(
+    { sub: user.id, type: "refresh", jti: randomUUID() },
+    secret,
+    {
+      expiresIn: "7d",
+    },
+  );
+
+  // Replace old refresh tokens with a new one
+  await prisma.$transaction(async (tx) => {
+    await tx.refreshToken.deleteMany({
+      where: { userId: user.id },
+    });
+
+    await tx.refreshToken.create({
+      data: {
+        token: refreshToken,
+        userId: user.id,
+      },
+    });
   });
 
   // Return user data and tokens
@@ -178,13 +200,21 @@ export const refresh: RequestHandler = async (req, res) => {
     return;
   }
 
-  const newAccessToken = jwt.sign({ sub: userId, type: "access" }, secret, {
-    expiresIn: "15m",
-  });
+  const newAccessToken = jwt.sign(
+    { sub: userId, type: "access", jti: randomUUID() },
+    secret,
+    {
+      expiresIn: "15m",
+    },
+  );
 
-  const newRefreshToken = jwt.sign({ sub: userId, type: "refresh" }, secret, {
-    expiresIn: "7d",
-  });
+  const newRefreshToken = jwt.sign(
+    { sub: userId, type: "refresh", jti: randomUUID() },
+    secret,
+    {
+      expiresIn: "7d",
+    },
+  );
 
   await prisma.$transaction(async (tx) => {
     await tx.refreshToken.delete({
@@ -206,11 +236,8 @@ export const refresh: RequestHandler = async (req, res) => {
 };
 
 export const logout: RequestHandler = async (req, res) => {
-  const { refreshToken } = req.body;
-
   await prisma.refreshToken.deleteMany({
     where: {
-      token: refreshToken,
       userId: req.user!.sub,
     },
   });

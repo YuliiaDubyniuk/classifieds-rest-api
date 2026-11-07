@@ -95,6 +95,16 @@ export const createAnnouncement: RequestHandler = async (req, res) => {
       category,
       userId,
     },
+    include: {
+      user: {
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          name: true,
+        },
+      },
+    },
   });
 
   res.status(201).json(announcement);
